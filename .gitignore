@@ -51,7 +51,6 @@ pip-wheel-metadata/
 # Ignora arquivos que possam conter senhas ou chaves de API.
 secrets.toml
 .streamlit/secrets.toml
-config.toml
 *.ini
 
 # Logs e Arquivos de Saída

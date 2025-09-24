@@ -103,7 +103,7 @@ def tela_login():
     col1, col2, col3 = st.columns([1,1,1])
     with col2:
         st.image("imagens/logo.png", width='stretch')
-        st.header("Controle de Refeições")
+        st.markdown("### Controle de Refeições")
         with st.form("login_form"):
             usuario = st.text_input("Usuário")
             senha = st.text_input("Senha", type="password")

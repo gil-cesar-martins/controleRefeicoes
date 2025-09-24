@@ -1,0 +1,64 @@
+# Banco de Dados Local
+# Essencial: nunca envie seu banco de dados para o GitHub!
+*.db
+*.sqlite
+*.sqlite3
+
+# Arquivos de Ambiente Virtual
+# Ignora pastas de ambientes virtuais como venv, env, etc.
+venv/
+.venv/
+env/
+.env/
+*.env
+env.bak/
+venv.bak/
+
+# Arquivos de Cache do Python
+# Ignora arquivos de cache e bytecode gerados pelo Python.
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Arquivos de Configuração de IDEs
+# Ignora configurações específicas de editores de código como VSCode, PyCharm.
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Arquivos de Sistema Operacional
+# Ignora arquivos gerados pelo sistema (macOS, Windows).
+.DS_Store
+Thumbs.db
+
+# Arquivos de Dependências e Build
+# Ignora arquivos de instalação e distribuição do Python.
+build/
+dist/
+*.egg-info/
+pip-wheel-metadata/
+.pytest_cache/
+.tox/
+
+# Arquivos de Segredos e Configuração Local
+# Ignora arquivos que possam conter senhas ou chaves de API.
+secrets.toml
+.streamlit/secrets.toml
+config.toml
+*.ini
+
+# Logs e Arquivos de Saída
+# Ignora arquivos de log e outros dados gerados pela aplicação.
+*.log
+*.csv
+*.xlsx
+*.xml
+*.json
+
+# Pasta de Imagens (se você não quiser versioná-las)
+# Descomente a linha abaixo se suas imagens são apenas locais e não fazem
+# parte do código essencial do app a ser "deployado".
+# imagens/

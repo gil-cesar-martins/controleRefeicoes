@@ -164,7 +164,7 @@ def display_colaboradores_editor(current_username, is_superadmin):
                                  (novo_id, novo_nome, re.sub(r'\D', '', novo_cpf), novo_cc, novo_os, 1 if novo_duas_vezes else 0, current_username, json.dumps(restaurantes_selecionados)))
                     st.success("Colaborador adicionado com sucesso!"); st.rerun()
 
-    st.markdown("---"); st.subheader("Colaboradores Cadastrados")
+    st.markdown("---"); st.markdown("### Colaboradores Cadastrados")
     st.info("Edite os dados na tabela. Para alterar restaurantes, remova e adicione o colaborador novamente.")
     colab_query = "SELECT id, nome, cpf, centro_custo, os, pode_duas_vezes, restaurantes_permitidos, criado_por_admin FROM colaboradores" + ("" if is_superadmin else " WHERE criado_por_admin = ?")
     df_colab_original = run_db_query(colab_query, params, fetch='dataframe')

@@ -137,7 +137,7 @@ def paginated_dataframe(df, page_size=20, key_prefix=""):
     cols[3].markdown(f"<p style='text-align: right; margin-top: 2rem;'>Página {current_page} de {total_pages}</p>", unsafe_allow_html=True)
 
 def display_colaboradores_editor(current_username, is_superadmin):
-    st.markdown("### Gerenciar Colaboradores")
+    st.subheader("Gerenciar Colaboradores")
     rest_query = "SELECT nome FROM restaurantes" + ("" if is_superadmin else " WHERE criado_por_admin = ?")
     params = None if is_superadmin else (current_username,)
     df_restaurantes = run_db_query(rest_query, params, fetch='dataframe')
@@ -173,48 +173,82 @@ def display_colaboradores_editor(current_username, is_superadmin):
                         st.success("Colaborador adicionado com sucesso!")
                         st.rerun()
 
-    st.markdown("---"); st.markdown("#### Colaboradores Cadastrados")
-    st.info("Você pode editar diretamente na tabela os campos 'Centro de Custo', 'OS' e 'Pode 2 Refeições?'. Para corrigir ID, Nome ou CPF, remova o colaborador e adicione-o novamente.")
+    st.markdown("---"); st.subheader("Colaboradores Cadastrados")
+    st.info("Crie colaboradores no formulário acima. Na tabela abaixo, edite os campos permitidos ou marque a caixa 'Deletar' e clique em 'Salvar Alterações' para remover um colaborador.")
 
     colab_query = "SELECT id, nome, cpf, centro_custo, os, pode_duas_vezes, restaurantes_permitidos, criado_por_admin FROM colaboradores" + ("" if is_superadmin else " WHERE criado_por_admin = ?")
     df_colab_original = run_db_query(colab_query, params, fetch='dataframe')
     if df_colab_original is None or df_colab_original.empty: return st.warning("Nenhum colaborador cadastrado.")
     
     df_para_editar = df_colab_original.copy()
+    
+    df_para_editar['Deletar'] = False
+    
     df_para_editar['pode_duas_vezes'] = df_para_editar['pode_duas_vezes'].astype(bool)
     df_para_editar['Restaurantes'] = df_para_editar['restaurantes_permitidos'].apply(lambda x: ", ".join(json.loads(x or '[]')))
-    colunas_visiveis = ['id', 'nome', 'cpf', 'centro_custo', 'os', 'pode_duas_vezes', 'Restaurantes'] + (['criado_por_admin'] if is_superadmin else [])
     
+    colunas_visiveis = ['Deletar', 'id', 'nome', 'cpf', 'centro_custo', 'os', 'pode_duas_vezes', 'Restaurantes'] + (['criado_por_admin'] if is_superadmin else [])
     
     config_colunas = {
+        "Deletar": st.column_config.CheckboxColumn("Deletar?", help="Marque para remover o colaborador ao salvar."),
         "id": st.column_config.TextColumn("ID", disabled=True), 
         "nome": st.column_config.TextColumn("Nome", disabled=True),
         "cpf": st.column_config.TextColumn("CPF", disabled=True),
         "centro_custo": st.column_config.TextColumn("Centro de Custo"),
         "os": st.column_config.TextColumn("OS"),
-        "pode_duas_vezes": st.column_config.CheckboxColumn("2 Refeições?"), 
-        "Restaurantes": st.column_config.TextColumn("Restaurantes"),
+        "pode_duas_vezes": st.column_config.CheckboxColumn("Pode 2 Refeições?"),
+        "Restaurantes": st.column_config.TextColumn("Restaurantes Permitidos", disabled=True),
         "criado_por_admin": st.column_config.TextColumn("Criado Por", disabled=True),
     }
 
-    edited_df = st.data_editor(df_para_editar[colunas_visiveis], num_rows='dynamic', width='stretch', hide_index=True, column_config=config_colunas, key="colab_editor")
+    edited_df = st.data_editor(
+        df_para_editar[colunas_visiveis], 
+        num_rows="fixed",
+        use_container_width=True, 
+        hide_index=True, 
+        column_config=config_colunas, 
+        key="colab_editor"
+    )
     
     if st.button("Salvar Alterações nos Colaboradores", type="primary"):
-        original_ids, edited_ids = set(df_colab_original['id']), set(edited_df['id'].dropna())
-        for colab_id in (original_ids - edited_ids):
-            run_db_query("DELETE FROM colaboradores WHERE id = ?", (colab_id,))
+
+        # Variáveis para contar as ações realizadas
+        deletados = 0
+        atualizados = 0
+
+        # Pega a lista de IDs para deletar a partir do estado atual do editor
+        ids_para_deletar = edited_df[edited_df['Deletar'] == True]['id'].tolist()
         
-        # A lógica de inserção foi movida para o formulário de adição, 
-        # então o data_editor só lida com atualizações e deleções.
-        for _, row in edited_df.iterrows():
-            if pd.isna(row['id']) or row['id'] not in original_ids: continue # Pula linhas novas ou vazias
-            
+        # Executa as deleções
+        if ids_para_deletar:
+            for colab_id in ids_para_deletar:
+                run_db_query("DELETE FROM colaboradores WHERE id = ?", (colab_id,))
+                deletados += 1
+        
+        # Filtra o DataFrame para não tentar atualizar as linhas que foram marcadas para deleção
+        df_para_atualizar = edited_df[~edited_df['id'].isin(ids_para_deletar)]
+
+        for _, row in df_para_atualizar.iterrows():
             pode_duas = 1 if row['pode_duas_vezes'] else 0
-            # A query de UPDATE não inclui mais nome e cpf
             run_db_query("UPDATE colaboradores SET centro_custo=?, os=?, pode_duas_vezes=? WHERE id=?",
                          (row.get('centro_custo'), row.get('os'), pode_duas, row['id']))
+            atualizados += 1
             
-        st.success("Dados dos colaboradores atualizados!"); st.rerun()
+        # Gera uma mensagem de sucesso mais informativa e força o recarregamento
+        mensagem = ""
+        if deletados > 0:
+            mensagem += f"{deletados} colaborador(es) removido(s). "
+        if atualizados > 0:
+            # A mensagem de atualização pode ser omitida para não poluir a tela
+            # mensagem += f"{atualizados} colaborador(es) atualizado(s). "
+            pass
+
+        if mensagem:
+            st.toast(mensagem, icon="✅")
+        
+        # Força o Streamlit a parar a execução atual e recomeçar do zero imediatamente,
+        # garantindo que todos os estados sejam limpos.
+        st.rerun()
 
 def verificar_e_registrar_refeicao(restaurante, colaborador_info):
     colab_id, colab_nome, colab_cc, colab_os, pode_duas_vezes, restaurantes_permitidos_json = colaborador_info

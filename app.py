@@ -110,7 +110,7 @@ if 'user_restaurant' not in st.session_state: st.session_state.user_restaurant =
 def tela_login():
     col1, col2, col3 = st.columns([1,1,1])
     with col2:
-        st.image("imagens/logo.png", use_column_width=True)
+        st.image("imagens/logo.png", width='stretch')
         st.markdown("### Controle de Refeições")
         with st.form("login_form"):
             usuario = st.text_input("Usuário")
@@ -252,7 +252,7 @@ def verificar_e_registrar_refeicao(restaurante, colaborador_info):
         st.error(f"🚫 Limite de {limite} refeição(ões) diária(s) já atingido para **{colab_nome}**.")
 
 def tela_1():
-    st.sidebar.image("imagens/logo.png", use_column_width=True)
+    st.sidebar.image("imagens/logo.png", width='stretch')
     st.sidebar.success(f"Logado como: {st.session_state.current_user}")
     if st.sidebar.button("Sair", use_container_width=True, type='primary'):
         st.session_state.clear(); st.rerun()

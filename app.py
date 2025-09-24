@@ -197,7 +197,7 @@ def display_colaboradores_editor(current_username, is_superadmin):
         "criado_por_admin": st.column_config.TextColumn("Criado Por", disabled=True),
     }
 
-    edited_df = st.data_editor(df_para_editar[colunas_visiveis], num_rows="fixed", width='stretch', hide_index=True, column_config=config_colunas, key="colab_editor")
+    edited_df = st.data_editor(df_para_editar[colunas_visiveis], num_rows='dynamic', width='stretch', hide_index=True, column_config=config_colunas, key="colab_editor")
     
     if st.button("Salvar Alterações nos Colaboradores", type="primary"):
         original_ids, edited_ids = set(df_colab_original['id']), set(edited_df['id'].dropna())

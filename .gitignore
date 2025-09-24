@@ -3,6 +3,10 @@
 *.db
 *.sqlite
 *.sqlite3
+# Ignorar arquivos de banco de dados SQLite e seus auxiliares
+*.db-wal
+*.db-shm
+*.db-info
 
 # Arquivos de Ambiente Virtual
 # Ignora pastas de ambientes virtuais como venv, env, etc.

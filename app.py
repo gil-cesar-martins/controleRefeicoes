@@ -154,18 +154,34 @@ def display_colaboradores_editor(current_username, is_superadmin):
             
             st.subheader("Restaurantes Permitidos")
             cols_rest = st.columns(3)
-            
             restaurantes_selecionados = [restaurante for i, restaurante in enumerate(restaurants_options) if cols_rest[i % 3].checkbox(restaurante, key=f"novo_{restaurante}")]
             
             if st.form_submit_button("Adicionar Colaborador", type="primary"):
                 if not all([novo_id, novo_nome, novo_cpf]):
                     st.error("ID, Nome e CPF são obrigatórios!")
                 else:
-                    run_db_query("INSERT INTO colaboradores (id, nome, cpf, centro_custo, os, pode_duas_vezes, criado_por_admin, restaurantes_permitidos) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                                 (novo_id, novo_nome, re.sub(r'\D', '', novo_cpf), novo_cc, novo_os, 1 if novo_duas_vezes else 0, current_username, json.dumps(restaurantes_selecionados)))
-                    st.success("Colaborador adicionado com sucesso!"); st.rerun()
+                    # <<< INÍCIO DA ALTERAÇÃO >>>
+                    
+                    # 1. Limpa o CPF para remover pontos e traços
+                    cpf_limpo = re.sub(r'\D', '', novo_cpf)
+                    
+                    # 2. Verifica se o CPF já existe no banco de dados
+                    cpf_existente = run_db_query("SELECT id FROM colaboradores WHERE cpf = ?", (cpf_limpo,), fetch='one')
+                    
+                    # 3. Se o CPF for encontrado, exibe o aviso
+                    if cpf_existente:
+                        st.warning("CPF já cadastrado.")
+                    else:
+                        # 4. Se não for encontrado, insere o novo colaborador
+                        run_db_query(
+                            "INSERT INTO colaboradores (id, nome, cpf, centro_custo, os, pode_duas_vezes, criado_por_admin, restaurantes_permitidos) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                            (novo_id, novo_nome, cpf_limpo, novo_cc, novo_os, 1 if novo_duas_vezes else 0, current_username, json.dumps(restaurantes_selecionados))
+                        )
+                        st.success("Colaborador adicionado com sucesso!")
+                        st.rerun()
+                    # <<< FIM DA ALTERAÇÃO >>>
 
-    st.markdown("---"); st.markdown("### Colaboradores Cadastrados")
+    st.markdown("---"); st.subheader("Colaboradores Cadastrados")
     st.info("Edite os dados na tabela. Para alterar restaurantes, remova e adicione o colaborador novamente.")
     colab_query = "SELECT id, nome, cpf, centro_custo, os, pode_duas_vezes, restaurantes_permitidos, criado_por_admin FROM colaboradores" + ("" if is_superadmin else " WHERE criado_por_admin = ?")
     df_colab_original = run_db_query(colab_query, params, fetch='dataframe')
@@ -182,7 +198,7 @@ def display_colaboradores_editor(current_username, is_superadmin):
         "Restaurantes": st.column_config.TextColumn("Restaurantes Permitidos", disabled=True),
         "criado_por_admin": st.column_config.TextColumn("Criado Por", disabled=True),
     }
-    edited_df = st.data_editor(df_para_editar[colunas_visiveis], num_rows="dynamic", width='stretch', hide_index=True, column_config=config_colunas, key="colab_editor")
+    edited_df = st.data_editor(df_para_editar[colunas_visiveis], num_rows="dynamic", use_container_width=True, hide_index=True, column_config=config_colunas, key="colab_editor")
     if st.button("Salvar Alterações nos Colaboradores", type="primary"):
         original_ids, edited_ids = set(df_colab_original['id']), set(edited_df['id'].dropna())
         for colab_id in (original_ids - edited_ids):
@@ -197,10 +213,6 @@ def display_colaboradores_editor(current_username, is_superadmin):
                 run_db_query("INSERT INTO colaboradores (id, nome, cpf, centro_custo, os, pode_duas_vezes, criado_por_admin, restaurantes_permitidos) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                              (row['id'], row['nome'], clean_cpf, row.get('centro_custo'), row.get('os'), pode_duas, current_username, '[]'))
         st.success("Dados dos colaboradores atualizados!"); st.rerun()
-
-import pytz # <<< ADICIONE ESTA IMPORTAÇÃO NO INÍCIO DO SEU ARQUIVO app.py
-
-# ... (resto do seu código) ...
 
 def verificar_e_registrar_refeicao(restaurante, colaborador_info):
     colab_id, colab_nome, colab_cc, colab_os, pode_duas_vezes, restaurantes_permitidos_json = colaborador_info

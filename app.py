@@ -7,6 +7,7 @@ import math
 import re
 import libsql
 import os
+import pytz
 
 st.set_page_config(
     layout="wide",
@@ -197,22 +198,43 @@ def display_colaboradores_editor(current_username, is_superadmin):
                              (row['id'], row['nome'], clean_cpf, row.get('centro_custo'), row.get('os'), pode_duas, current_username, '[]'))
         st.success("Dados dos colaboradores atualizados!"); st.rerun()
 
+import pytz # <<< ADICIONE ESTA IMPORTAÇÃO NO INÍCIO DO SEU ARQUIVO app.py
+
+# ... (resto do seu código) ...
+
 def verificar_e_registrar_refeicao(restaurante, colaborador_info):
     colab_id, colab_nome, colab_cc, colab_os, pode_duas_vezes, restaurantes_permitidos_json = colaborador_info
     lista_permitida = json.loads(restaurantes_permitidos_json or '[]')
+    
     if restaurante not in lista_permitida:
         return st.error(f"Acesso negado. **{colab_nome}** não tem permissão para **{restaurante}**.")
+    
     datas_restaurante = run_db_query("SELECT data_inicio, data_fim FROM restaurantes WHERE nome = ?", (restaurante,), fetch='one')
     if not datas_restaurante or not all(datas_restaurante):
         return st.error(f"Acesso negado. Restaurante '{restaurante}' sem período de validade configurado.")
+    
     hoje = date.today()
     if not (datetime.strptime(datas_restaurante[0], '%Y-%m-%d').date() <= hoje <= datetime.strptime(datas_restaurante[1], '%Y-%m-%d').date()):
         return st.error(f"Acesso negado. Período de validade do restaurante '{restaurante}' expirou ou não começou.")
+    
     refeicoes_hoje_result = run_db_query("SELECT COUNT(*) FROM registros WHERE colaborador_id = ? AND DATE(data_hora) = ?", (colab_id, hoje.strftime("%Y-%m-%d")), fetch='one')
     refeicoes_hoje = refeicoes_hoje_result[0] if refeicoes_hoje_result else 0
     limite = 2 if pode_duas_vezes == 1 else 1
+
     if refeicoes_hoje < limite:
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        # 1. Define o fuso horário de São Paulo (que cobre a maior parte do Brasil)
+        br_timezone = pytz.timezone("America/Sao_Paulo")
+        
+        # 2. Pega a hora atual "ciente" de que está em UTC
+        utc_now = datetime.now(pytz.utc)
+        
+        # 3. Converte a hora UTC para o fuso horário do Brasil
+        br_now = utc_now.astimezone(br_timezone)
+        
+        # 4. Formata a hora do Brasil para salvar no banco de dados
+        timestamp = br_now.strftime("%Y-%m-%d %H:%M:%S")
+
         run_db_query("INSERT INTO registros (restaurante, colaborador_nome, colaborador_id, centro_custo, os, data_hora) VALUES (?, ?, ?, ?, ?, ?)",
                      (restaurante, colab_nome, colab_id, colab_cc, colab_os, timestamp))
         st.success(f"✅ Acesso registrado para: **{colab_nome}**"); st.balloons()

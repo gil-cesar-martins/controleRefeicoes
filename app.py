@@ -297,7 +297,7 @@ def tela_1():
                             run_db_query("INSERT INTO usuarios_adm (username, nome, email, senha, is_superadmin) VALUES (?, ?, ?, ?, ?)", (row['username'], row['nome'], row['email'], row['senha'], is_super_int))
                     st.success("Administradores atualizados!"); st.rerun()
 
-    st.markdown("---"); st.markdown("###🍝 Relatório de Refeições")
+    st.markdown("---"); st.markdown("### Relatório de Refeições")
     with st.expander("🔍 Filtros e Exportação"):
         col1, col2, col3 = st.columns(3)
         data_inicio, data_fim = col1.date_input("Data de início", None, format="DD/MM/YYYY"), col2.date_input("Data de fim", None, format="DD/MM/YYYY")

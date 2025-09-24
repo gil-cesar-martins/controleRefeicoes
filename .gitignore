@@ -62,7 +62,5 @@ config.toml
 *.xml
 *.json
 
-# Pasta de Imagens (se você não quiser versioná-las)
-# Descomente a linha abaixo se suas imagens são apenas locais e não fazem
-# parte do código essencial do app a ser "deployado".
-# imagens/
+
+imagens/

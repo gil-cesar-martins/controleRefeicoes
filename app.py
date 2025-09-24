@@ -16,7 +16,6 @@ st.set_page_config(
     page_title="Controle de Refeições"
 )
 
-# --- BLOCO DE BANCO DE DADOS (sem alterações) ---
 def get_db_connection():
     try:
         url = st.secrets["database"]["url"]
@@ -52,7 +51,6 @@ def run_db_query(query: str, params=None, fetch=None):
     finally:
         if conn: conn.close()
 
-# --- Funções Auxiliares (sem alterações) ---
 def to_excel(df: pd.DataFrame):
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
@@ -80,8 +78,7 @@ def init_db():
             data_fim TEXT
         )
     """)
-    # A tabela adm_restaurante foi removida.
-    
+       
     count_result = run_db_query("SELECT COUNT(*) FROM usuarios_adm", fetch='one')
     if count_result and count_result[0] == 0:
         try:
@@ -107,7 +104,6 @@ def tela_login():
             usuario = st.text_input("Usuário")
             senha = st.text_input("Senha", type="password")
             if st.form_submit_button("ENTRAR", type='primary', width='stretch'):
-                # 1. Tenta logar como Admin
                 admin_data = run_db_query("SELECT nome, username, is_superadmin FROM usuarios_adm WHERE username = ? AND senha = ?", params=(usuario, senha), fetch='one')
                 if admin_data:
                     st.session_state.logged_in = True
@@ -116,7 +112,6 @@ def tela_login():
                     st.session_state.is_superadmin = (is_super_int == 1)
                     st.rerun()
                 else:
-                    # 2. Se não for Admin, tenta logar como Restaurante
                     rest_data = run_db_query("SELECT nome, username FROM restaurantes WHERE username = ? AND senha = ?", params=(usuario, senha), fetch='one')
                     if rest_data:
                         st.session_state.logged_in = True
@@ -147,7 +142,6 @@ def paginated_dataframe(df, page_size=20, key_prefix=""):
     cols[3].markdown(f"<p style='text-align: right; margin-top: 2rem;'>Página {current_page} de {total_pages}</p>", unsafe_allow_html=True)
 
 def display_colaboradores_editor(current_username, is_superadmin):
-    # (código sem alterações)
     st.subheader("Gerenciar Colaboradores")
     rest_query = "SELECT nome FROM restaurantes" + ("" if is_superadmin else " WHERE criado_por_admin = ?")
     params = None if is_superadmin else (current_username,)
@@ -216,7 +210,6 @@ def display_colaboradores_editor(current_username, is_superadmin):
         st.rerun()
 
 def verificar_e_registrar_refeicao(restaurante, colaborador_info):
-    # (código sem alterações)
     colab_id, colab_nome, colab_cc, colab_os, pode_duas_vezes, restaurantes_permitidos_json = colaborador_info
     lista_permitida = json.loads(restaurantes_permitidos_json or '[]')
     if restaurante not in lista_permitida:
@@ -249,7 +242,7 @@ def display_reports():
         is_open = st.expander("🔍 Filtros e Exportação", expanded=True)
 
         if is_open:
-            # Enquanto o expander estiver aberto, mostramos o conteúdo.
+            
             col1, col2, col3 = st.columns(3)
             data_inicio, data_fim = col1.date_input("Data de início", None, format="DD/MM/YYYY"), col2.date_input("Data de fim", None, format="DD/MM/YYYY")
             restaurante, colaborador = col1.text_input("Restaurante"), col2.text_input("Colaborador")
@@ -272,7 +265,7 @@ def display_reports():
                 st.write(f"**{len(df_registros)} registros encontrados.**")
                 paginated_dataframe(df_registros, 20, "registros")
                 df_xlsx = to_excel(df_registros)
-                st.download_button("📥 Baixar Relatório (XLSX)", df_xlsx, f"relatorio_{date.today():%d-%m-%Y}.xlsx", use_container_width=True, type='primary')
+                st.download_button("📥 Baixar Relatório (XLSX)", df_xlsx, f"relatorio_{date.today():%d-%m-%Y}.xlsx", width='stretch', type='primary')
             else:
                 st.info("Nenhum registro encontrado para os filtros selecionados.")
         else:
@@ -329,18 +322,20 @@ def tela_1():
             else:
                 selected_restaurant = st.selectbox("Selecione o Restaurante", user_restaurants)
                 cpf_input = st.text_input("Digite o CPF do colaborador", key="cpf_input_admin")
-                if st.button("Registrar Refeição", key="btn_cpf_admin", width='stretch', type="primary"):
-                    if cpf_limpo := re.sub(r'\D', '', cpf_input):
-                        found_collaborator = run_db_query("SELECT id, nome, centro_custo, os, pode_duas_vezes, restaurantes_permitidos FROM colaboradores WHERE cpf = ?", (cpf_limpo,), fetch='one')
-                        if found_collaborator:
-                            verificar_e_registrar_refeicao(selected_restaurant, found_collaborator)
-                        else: st.error("CPF não encontrado.")
-                    else: st.warning("Por favor, digite um CPF válido.")
+                col_btn_Reg1,col_btn_Reg2,col_btn_Reg3 = st.columns([2,1,2])
+                with col_btn_Reg2:
+                    if st.button("Registrar Refeição", key="btn_cpf_admin", width='stretch', type="primary"):
+                        if cpf_limpo := re.sub(r'\D', '', cpf_input):
+                            found_collaborator = run_db_query("SELECT id, nome, centro_custo, os, pode_duas_vezes, restaurantes_permitidos FROM colaboradores WHERE cpf = ?", (cpf_limpo,), fetch='one')
+                            if found_collaborator:
+                                verificar_e_registrar_refeicao(selected_restaurant, found_collaborator)
+                            else: st.error("CPF não encontrado.")
+                        else: st.warning("Por favor, digite um CPF válido.")
 
         with tabs[1]: # Colaboradores
             display_colaboradores_editor(username, is_super)
         
-        with tabs[2]: # Restaurantes (agora com gerenciamento de login)
+        with tabs[2]: # Restaurantes
             st.subheader("Gerenciar Restaurantes e Logins")
             st.info("Adicione ou edite restaurantes e as credenciais de login para cada um.")
             query = "SELECT nome, username, senha, criado_por_admin, data_inicio, data_fim FROM restaurantes"
@@ -360,9 +355,9 @@ def tela_1():
                     "nome": st.column_config.TextColumn("Nome do Restaurante", required=True), 
                     "username": st.column_config.TextColumn("Username de Acesso", required=True),
                     "senha": st.column_config.TextColumn("Senha de Acesso", required=True, help="A senha ficará visível durante a edição."),
-                    "data_inicio": st.column_config.DateColumn("Início", format="DD/MM/YYYY", required=True,help="A data de início do contrato é obrigatória."),
-                    "data_fim": st.column_config.DateColumn("Fim", format="DD/MM/YYYY", required=True, help="A data de término do contrato é obrigatória."), 
-                    "criado_por_admin": st.column_config.TextColumn("Criado Por", disabled=True, default="Você")
+                    "data_inicio": st.column_config.DateColumn("Início", format="DD/MM/YYYY", required=True),
+                    "data_fim": st.column_config.DateColumn("Fim", format="DD/MM/YYYY", required=True), 
+                    "criado_por_admin": st.column_config.TextColumn("Criado Por", disabled=True)
                 }
                 edited_df = st.data_editor(df_rest, num_rows="dynamic", key="rest_editor", width='stretch', hide_index=True, column_config=config)
                 
@@ -388,76 +383,49 @@ def tela_1():
                                          (row['nome'], row['username'], row['senha'], username, data_i, data_f))
                     st.success("Restaurantes atualizados!"); st.rerun()
 
-        # <<< INÍCIO DA CORREÇÃO E IMPLEMENTAÇÃO COMPLETA >>>
         if is_super:
             with tabs[3]: # Administradores
                 st.subheader("Gerenciar Administradores")
-                st.info("Adicione, edite ou remova outros usuários administradores.")
-
-                # Busca todos os admins, exceto o próprio superadmin logado
                 df_admin_original = run_db_query("SELECT username, nome, email, senha, is_superadmin FROM usuarios_adm WHERE username != ?", (username,), fetch='dataframe')
-                
                 if df_admin_original is not None:
                     df_admin = df_admin_original.copy()
                     df_admin['is_superadmin'] = df_admin['is_superadmin'].astype(bool)
-
-                    config_admin = {
-                        "username": st.column_config.TextColumn("Username", required=True),
-                        "nome": st.column_config.TextColumn("Nome Completo", required=True),
-                        "email": st.column_config.TextColumn("Email"),
-                        "senha": st.column_config.TextColumn("Senha", required=True, help="A senha ficará visível durante a edição."),
-                        "is_superadmin": st.column_config.CheckboxColumn("É Super Admin?")
-                    }
-                    
-                    edited_df_admin = st.data_editor(df_admin, num_rows="dynamic", key="admin_editor", width='stretch', hide_index=True, column_config=config_admin)
-                    
+                    edited_df_admin = st.data_editor(df_admin, num_rows="dynamic", key="admin_editor", width='stretch', hide_index=True, 
+                                                     column_config={"is_superadmin": st.column_config.CheckboxColumn("É Super Usuário?"),
+                                                                    "senha": st.column_config.TextColumn("Senha", required=True, help="A senha ficará visível durante a edição.")})
                     if st.button("Salvar Dados dos Administradores", type="primary"):
-                        original_users = set(df_admin_original['username']) if not df_admin_original.empty else set()
-                        edited_users = set(edited_df_admin['username'].dropna())
-
-                        # Lógica de Deleção
+                        original_users, edited_users = set(df_admin_original['username']), set(edited_df['username'].dropna())
                         for user_to_delete in (original_users - edited_users):
                             run_db_query("DELETE FROM usuarios_adm WHERE username = ?", (user_to_delete,))
-
-                        # Lógica de Inserção e Atualização
                         for _, row in edited_df_admin.iterrows():
                             if pd.isna(row['username']): continue
-                            
                             is_super_int = 1 if row['is_superadmin'] else 0
-                            
                             if row['username'] in original_users:
-                                # Atualiza um admin existente
                                 run_db_query("UPDATE usuarios_adm SET nome = ?, email = ?, senha = ?, is_superadmin = ? WHERE username = ?",
                                              (row['nome'], row['email'], row['senha'], is_super_int, row['username']))
                             else:
-                                # Insere um novo admin
                                 run_db_query("INSERT INTO usuarios_adm (username, nome, email, senha, is_superadmin) VALUES (?, ?, ?, ?, ?)",
                                              (row['username'], row['nome'], row['email'], row['senha'], is_super_int))
+                        st.success("Administradores atualizados com sucesso!"); st.rerun()
                         
-                        st.success("Administradores atualizados com sucesso!")
-                        st.rerun()
-        # <<< FIM DA CORREÇÃO >>>
-
-        # Relatórios para todos os admins
         display_reports()
 
-    # --- VISÃO DO RESTAURANTE ---
     elif st.session_state.role == "restaurante":
         st.markdown(f"### Registro de Refeição - {st.session_state.restaurante_associado}")
         
         selected_restaurant = st.session_state.restaurante_associado
-        cpf_input = st.text_input("Digite o CPF do colaborador", key="cpf_input_owner")
-        
-        if st.button("Registrar Refeição", key="btn_cpf_owner", width='stretch', type="primary"):
-            if cpf_limpo := re.sub(r'\D', '', cpf_input):
-                found_collaborator = run_db_query("SELECT id, nome, centro_custo, os, pode_duas_vezes, restaurantes_permitidos FROM colaboradores WHERE cpf = ?", (cpf_limpo,), fetch='one')
-                if found_collaborator:
-                    verificar_e_registrar_refeicao(selected_restaurant, found_collaborator)
-                else: st.error("CPF não encontrado.")
-            else: st.warning("Por favor, digite um CPF válido.")
-        
-        # Relatórios para o usuário do restaurante
-        display_reports()
+        col_cpf1,col_cpf2, col_cpf3 = st.columns([1,2,1])
+        with col_cpf2:
+            cpf_input = st.text_input("Digite o CPF do colaborador", key="cpf_input_owner")
+        col_btn_Reg4, col_btn_Reg5, col_btn_Reg6 = st.columns([1,2,1])
+        with col_btn_Reg5:
+            if st.button("Registrar Refeição", key="btn_cpf_owner", width='stretch', type="primary"):
+                if cpf_limpo := re.sub(r'\D', '', cpf_input):
+                    found_collaborator = run_db_query("SELECT id, nome, centro_custo, os, pode_duas_vezes, restaurantes_permitidos FROM colaboradores WHERE cpf = ?", (cpf_limpo,), fetch='one')
+                    if found_collaborator:
+                        verificar_e_registrar_refeicao(selected_restaurant, found_collaborator)
+                    else: st.error("CPF não encontrado.")
+                else: st.warning("Por favor, digite um CPF válido.")
 
 # --- ROTEADOR PRINCIPAL ---
 if 'db_initialized' not in st.session_state:

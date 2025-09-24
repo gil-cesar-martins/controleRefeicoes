@@ -229,7 +229,7 @@ def tela_1():
     registro, colaboradores, restaurantes, *admin_tab = st.tabs(tab_titles)
     
     with registro:
-        st.title("Registro de Refeição")
+        st.markdown("### Registro de Refeição")
         rest_query = "SELECT nome FROM restaurantes" + ("" if is_super else " WHERE criado_por_admin = ?")
         params = None if is_super else (username,)
         df_restaurants = run_db_query(rest_query, params, fetch='dataframe')

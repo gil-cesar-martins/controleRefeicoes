@@ -235,7 +235,7 @@ def verificar_e_registrar_refeicao(restaurante, colaborador_info):
         st.error(f"🚫 Limite de {limite} refeição(ões) diária(s) já atingido para **{colab_nome}**.")
 
 def display_reports():
-    """Exibe a seção de relatórios sem validação de senha."""
+    """Exibe a seção de relatórios com filtros de permissão baseados no tipo de usuário."""
     st.markdown("---")
     st.markdown("### Relatório de Refeições")
 
@@ -243,40 +243,62 @@ def display_reports():
         col1, col2, col3 = st.columns(3)
         with col1:
             data_inicio = st.date_input("Data de início", None, format="DD/MM/YYYY")
-            restaurante = st.text_input("Restaurante")
+            restaurante_filtro = st.text_input("Filtrar por Restaurante")
         with col2:
             data_fim = st.date_input("Data de fim", None, format="DD/MM/YYYY")
-            colaborador = st.text_input("Colaborador")
+            colaborador_filtro = st.text_input("Filtrar por Colaborador")
         with col3:
-            centro_custo = st.text_input("Centro de Custo")
-            os_filtro = st.text_input("OS")
-    
+            centro_custo_filtro = st.text_input("Filtrar por Centro de Custo")
+            os_filtro = st.text_input("Filtrar por OS")
+
         query = "SELECT r.restaurante AS 'Restaurante', r.colaborador_nome AS 'Nome', c.cpf AS 'CPF', r.colaborador_id AS 'ID', r.centro_custo AS 'Centro de Custo', r.os as 'OS', r.data_hora AS 'Data e Hora' FROM registros r JOIN colaboradores c ON r.colaborador_id = c.id WHERE 1=1"
         params = []
+
+        # --- LÓGICA DE PERMISSÃO DE VISUALIZAÇÃO ---
+        user_role = st.session_state.get('role')
+        is_super = st.session_state.get('is_superadmin', False)
+        username = st.session_state.get('current_username')
+
+        if user_role == 'admin' and not is_super:
+            # Admin Padrão: Vê apenas registros de restaurantes que ele criou.
+            df_restaurantes_admin = run_db_query("SELECT nome FROM restaurantes WHERE criado_por_admin = ?", (username,), fetch='dataframe')
+            if df_restaurantes_admin is not None and not df_restaurantes_admin.empty:
+                lista_restaurantes = df_restaurantes_admin['nome'].tolist()
+                placeholders = ','.join('?' for _ in lista_restaurantes)
+                query += f" AND r.restaurante IN ({placeholders})"
+                params.extend(lista_restaurantes)
+            else:
+                # Se o admin não tem restaurantes, não mostra nenhum registro.
+                query += " AND 1=0"
+        
+        elif user_role == 'restaurante':
+            # Usuário Restaurante: Vê apenas os registros do seu próprio restaurante.
+            # A lógica de registro já garante que o colaborador estava vinculado.
+            query += " AND r.restaurante = ?"
+            params.append(st.session_state.restaurante_associado)
+        
+        # O Super Admin não recebe filtros adicionais, vendo todos os registros por padrão.
+
+        # --- APLICAÇÃO DOS FILTROS DO USUÁRIO ---
         if data_inicio: 
             query += " AND DATE(r.data_hora) >= ?"
             params.append(data_inicio.strftime('%Y-%m-%d'))
         if data_fim: 
             query += " AND DATE(r.data_hora) <= ?"
             params.append(data_fim.strftime('%Y-%m-%d'))
-        if restaurante: 
+        if restaurante_filtro: 
             query += " AND r.restaurante LIKE ?"
-            params.append(f'%{restaurante}%')
-        if colaborador: 
+            params.append(f'%{restaurante_filtro}%')
+        if colaborador_filtro: 
             query += " AND r.colaborador_nome LIKE ?"
-            params.append(f'%{colaborador}%')
-        if centro_custo: 
+            params.append(f'%{colaborador_filtro}%')
+        if centro_custo_filtro: 
             query += " AND r.centro_custo LIKE ?"
-            params.append(f'%{centro_custo}%')
+            params.append(f'%{centro_custo_filtro}%')
         if os_filtro: 
             query += " AND r.os LIKE ?"
             params.append(f'%{os_filtro}%')
         
-        # Se o usuário for um restaurante, filtra os relatórios apenas para aquele restaurante
-        if st.session_state.role == "restaurante":
-            query += " AND r.restaurante = ?"
-            params.append(st.session_state.restaurante_associado)
-
         query += " ORDER BY r.data_hora DESC"
         
         df_registros = run_db_query(query, params, fetch='dataframe')
@@ -286,7 +308,9 @@ def display_reports():
             st.write(f"**{len(df_registros)} registros encontrados.**")
             paginated_dataframe(df_registros, 20, "registros")
             df_xlsx = to_excel(df_registros)
-            st.download_button("📥 Baixar Relatório (XLSX)", df_xlsx, f"relatorio_{date.today():%d-%m-%Y}.xlsx", width='stretch', type='primary')
+            col_download1, col_download2, col_download3 = st.columns([1,2,1])
+            with col_download2:
+                st.download_button("📥 Baixar Relatório (XLSX)", df_xlsx, f"relatorio_{date.today():%d-%m-%Y}.xlsx", width='stretch', type='primary')
         else:
             st.info("Nenhum registro encontrado para os filtros selecionados.")
 

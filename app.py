@@ -386,6 +386,7 @@ def tela_1():
         if is_super:
             with tabs[3]: # Administradores
                 st.subheader("Gerenciar Administradores")
+                # Esta query já exclui o superadmin logado, o que está correto.
                 df_admin_original = run_db_query("SELECT username, nome, email, senha, is_superadmin FROM usuarios_adm WHERE username != ?", (username,), fetch='dataframe')
                 if df_admin_original is not None:
                     df_admin = df_admin_original.copy()
@@ -394,11 +395,18 @@ def tela_1():
                                                      column_config={"is_superadmin": st.column_config.CheckboxColumn("É Super Usuário?"),
                                                                     "senha": st.column_config.TextColumn("Senha", required=True, help="A senha ficará visível durante a edição.")})
                     if st.button("Salvar Dados dos Administradores", type="primary"):
-                        original_users, edited_users = set(df_admin_original['username']), set(edited_df['username'].dropna())
+                        # CORREÇÃO APLICADA AQUI: de edited_df para edited_df_admin
+                        original_users = set(df_admin_original['username']) if not df_admin_original.empty else set()
+                        edited_users = set(edited_df_admin['username'].dropna())
+                        
                         for user_to_delete in (original_users - edited_users):
                             run_db_query("DELETE FROM usuarios_adm WHERE username = ?", (user_to_delete,))
+                        
                         for _, row in edited_df_admin.iterrows():
-                            if pd.isna(row['username']): continue
+                            if pd.isna(row['username']) or pd.isna(row['nome']) or pd.isna(row['senha']):
+                                st.warning(f"Pulando linha de administrador com dados incompletos: {row['username']}")
+                                continue
+                            
                             is_super_int = 1 if row['is_superadmin'] else 0
                             if row['username'] in original_users:
                                 run_db_query("UPDATE usuarios_adm SET nome = ?, email = ?, senha = ?, is_superadmin = ? WHERE username = ?",
@@ -406,8 +414,8 @@ def tela_1():
                             else:
                                 run_db_query("INSERT INTO usuarios_adm (username, nome, email, senha, is_superadmin) VALUES (?, ?, ?, ?, ?)",
                                              (row['username'], row['nome'], row['email'], row['senha'], is_super_int))
-                        st.success("Administradores atualizados com sucesso!"); st.rerun()
                         
+                        st.success("Administradores atualizados com sucesso!"); st.rerun()              
         display_reports()
 
     elif st.session_state.role == "restaurante":

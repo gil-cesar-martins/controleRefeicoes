@@ -235,65 +235,60 @@ def verificar_e_registrar_refeicao(restaurante, colaborador_info):
         st.error(f"🚫 Limite de {limite} refeição(ões) diária(s) já atingido para **{colab_nome}**.")
 
 def display_reports():
-    """Função isolada para exibir a seção de relatórios com validação de senha do usuário logado."""
-    st.markdown("---"); st.markdown("### Relatório de Refeições")
-    if st.session_state.get('report_access', False):
-        
-        is_open = st.expander("🔍 Filtros e Exportação", expanded=True)
+    """Exibe a seção de relatórios sem validação de senha."""
+    st.markdown("---")
+    st.markdown("### Relatório de Refeições")
 
-        if is_open:
-            
-            col1, col2, col3 = st.columns(3)
-            data_inicio, data_fim = col1.date_input("Data de início", None, format="DD/MM/YYYY"), col2.date_input("Data de fim", None, format="DD/MM/YYYY")
-            restaurante, colaborador = col1.text_input("Restaurante"), col2.text_input("Colaborador")
-            centro_custo, os_filtro = col3.text_input("Centro de Custo"), col3.text_input("OS")
+    with st.expander("🔍 Filtros e Exportação", expanded=True):
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            data_inicio = st.date_input("Data de início", None, format="DD/MM/YYYY")
+            restaurante = st.text_input("Restaurante")
+        with col2:
+            data_fim = st.date_input("Data de fim", None, format="DD/MM/YYYY")
+            colaborador = st.text_input("Colaborador")
+        with col3:
+            centro_custo = st.text_input("Centro de Custo")
+            os_filtro = st.text_input("OS")
+    
+        query = "SELECT r.restaurante AS 'Restaurante', r.colaborador_nome AS 'Nome', c.cpf AS 'CPF', r.colaborador_id AS 'ID', r.centro_custo AS 'Centro de Custo', r.os as 'OS', r.data_hora AS 'Data e Hora' FROM registros r JOIN colaboradores c ON r.colaborador_id = c.id WHERE 1=1"
+        params = []
+        if data_inicio: 
+            query += " AND DATE(r.data_hora) >= ?"
+            params.append(data_inicio.strftime('%Y-%m-%d'))
+        if data_fim: 
+            query += " AND DATE(r.data_hora) <= ?"
+            params.append(data_fim.strftime('%Y-%m-%d'))
+        if restaurante: 
+            query += " AND r.restaurante LIKE ?"
+            params.append(f'%{restaurante}%')
+        if colaborador: 
+            query += " AND r.colaborador_nome LIKE ?"
+            params.append(f'%{colaborador}%')
+        if centro_custo: 
+            query += " AND r.centro_custo LIKE ?"
+            params.append(f'%{centro_custo}%')
+        if os_filtro: 
+            query += " AND r.os LIKE ?"
+            params.append(f'%{os_filtro}%')
         
-            query = "SELECT r.restaurante AS 'Restaurante', r.colaborador_nome AS 'Nome', c.cpf AS 'CPF', r.colaborador_id AS 'ID', r.centro_custo AS 'Centro de Custo', r.os as 'OS', r.data_hora AS 'Data e Hora' FROM registros r JOIN colaboradores c ON r.colaborador_id = c.id WHERE 1=1"
-            params = []
-            if data_inicio: query += " AND DATE(r.data_hora) >= ?"; params.append(data_inicio.strftime('%Y-%m-%d'))
-            if data_fim: query += " AND DATE(r.data_hora) <= ?"; params.append(data_fim.strftime('%Y-%m-%d'))
-            if restaurante: query += " AND r.restaurante LIKE ?"; params.append(f'%{restaurante}%')
-            if colaborador: query += " AND r.colaborador_nome LIKE ?"; params.append(f'%{colaborador}%')
-            if centro_custo: query += " AND r.centro_custo LIKE ?"; params.append(f'%{centro_custo}%')
-            if os_filtro: query += " AND r.os LIKE ?"; params.append(f'%{os_filtro}%')
-            query += " ORDER BY r.data_hora DESC"
-            
-            df_registros = run_db_query(query, params, fetch='dataframe')
-            
-            if df_registros is not None and not df_registros.empty:
-                df_registros['Data e Hora'] = pd.to_datetime(df_registros['Data e Hora']).dt.strftime('%d/%m/%Y %H:%M:%S')
-                st.write(f"**{len(df_registros)} registros encontrados.**")
-                paginated_dataframe(df_registros, 20, "registros")
-                df_xlsx = to_excel(df_registros)
-                st.download_button("📥 Baixar Relatório (XLSX)", df_xlsx, f"relatorio_{date.today():%d-%m-%Y}.xlsx", width='stretch', type='primary')
-            else:
-                st.info("Nenhum registro encontrado para os filtros selecionados.")
+        # Se o usuário for um restaurante, filtra os relatórios apenas para aquele restaurante
+        if st.session_state.role == "restaurante":
+            query += " AND r.restaurante = ?"
+            params.append(st.session_state.restaurante_associado)
+
+        query += " ORDER BY r.data_hora DESC"
+        
+        df_registros = run_db_query(query, params, fetch='dataframe')
+        
+        if df_registros is not None and not df_registros.empty:
+            df_registros['Data e Hora'] = pd.to_datetime(df_registros['Data e Hora']).dt.strftime('%d/%m/%Y %H:%M:%S')
+            st.write(f"**{len(df_registros)} registros encontrados.**")
+            paginated_dataframe(df_registros, 20, "registros")
+            df_xlsx = to_excel(df_registros)
+            st.download_button("📥 Baixar Relatório (XLSX)", df_xlsx, f"relatorio_{date.today():%d-%m-%Y}.xlsx", width='stretch', type='primary')
         else:
-            st.session_state.report_access = False
-            st.rerun()
-
-    # Se o acesso não foi concedido, mostramos o expander de senha.
-    else:
-        with st.expander("🔒 Acessar Relatórios"):
-            with st.form("password_form"):
-                password = st.text_input("Para sua segurança, digite sua senha novamente para ver os relatórios", type="password")
-                if st.form_submit_button("Acessar"):
-                    user_role = st.session_state.get('role')
-                    username = st.session_state.get('current_username')
-                    
-                    correct_password = None
-                    if user_role == 'admin':
-                        result = run_db_query("SELECT senha FROM usuarios_adm WHERE username = ?", (username,), fetch='one')
-                        if result: correct_password = result[0]
-                    elif user_role == 'restaurante':
-                        result = run_db_query("SELECT senha FROM restaurantes WHERE username = ?", (username,), fetch='one')
-                        if result: correct_password = result[0]
-
-                    if correct_password and password == correct_password:
-                        st.session_state.report_access = True
-                        st.rerun()
-                    else:
-                        st.error("Senha incorreta.")                 
+            st.info("Nenhum registro encontrado para os filtros selecionados.")
 
 def tela_1():
     st.sidebar.image("imagens/logo.png", width='stretch')

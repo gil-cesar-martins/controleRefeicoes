@@ -1,7 +1,5 @@
 aiohappyeyeballs==2.6.1
 aiohttp==3.12.15
-aioice==0.10.1
-aiortc==1.13.0
 aiosignal==1.4.0
 alabaster==1.0.0
 altair==5.5.0
@@ -42,8 +40,6 @@ multidict==6.6.4
 narwhals==2.5.0
 numpy==2.2.6
 oauthlib==3.3.1
-opencv-python==4.12.0.88
-opencv-python-headless==4.12.0.88
 openpyxl==3.1.5
 packaging==25.0
 pandas==2.3.2
@@ -57,7 +53,6 @@ pycparser==2.23
 pydeck==0.9.1
 pyee==13.0.0
 Pygments==2.19.2
-pylibsrtp==0.12.0
 pyOpenSSL==25.3.0
 python-dateutil==2.9.0.post0
 pytz==2025.2
@@ -84,7 +79,6 @@ sqlparse==0.5.3
 st-gsheets-connection==0.1.0
 streamlit==1.49.1
 streamlit-qrcode-scanner==0.1.2
-streamlit-webrtc==0.63.4
 tenacity==9.1.2
 toml==0.10.2
 tornado==6.5.2

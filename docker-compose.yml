@@ -1,0 +1,11 @@
+services:
+  app-refeicao:
+    build: .
+    container_name: registro_colaboradores
+    privileged: true  # Necessário para acessar o USB do leitor
+    volumes:
+      - .:/app
+      - /dev:/dev     # Mapeia o hardware do leitor para o container
+    ports:
+      - "8501:8501"
+    restart: unless-stopped

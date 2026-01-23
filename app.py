@@ -10,7 +10,9 @@ import os
 import pytz
 import face_recognition
 import numpy as np
+import PIL.Image
 
+# Configuração da página
 st.set_page_config(
     layout="wide",
     page_icon="🥗",
@@ -98,45 +100,48 @@ def init_db():
 # --- FUNÇÕES DE RECONHECIMENTO FACIAL ---
 
 def processar_imagem_facial(image_file):
-    """Extrai o embedding (vetor) de uma imagem capturada."""
     try:
+        # 1. Carrega a imagem
         image = face_recognition.load_image_file(image_file)
-        encodings = face_recognition.face_encodings(image)
+        
+        face_locations = face_recognition.face_locations(image, number_of_times_to_upsample=2)
+        
+        if len(face_locations) == 0:
+            st.sidebar.warning("Nenhum mapa de pontos faciais detectado.")
+            return None
+        
+        encodings = face_recognition.face_encodings(image, known_face_locations=face_locations)
+        
         if len(encodings) > 0:
             return json.dumps(encodings[0].tolist())
+            
         return None
     except Exception as e:
-        st.error(f"Erro no processamento facial: {e}")
+        st.error(f"Erro no mapeamento de pontos: {e}")
         return None
 
 def reconhecer_colaborador_por_foto(foto_capturada, restaurante_nome):
-    """Compara a foto capturada com os rostos permitidos no restaurante."""
-    # 1. Extrai o encoding da foto atual
     encoding_atual = face_recognition.face_encodings(face_recognition.load_image_file(foto_capturada))
     if not encoding_atual:
         st.warning("Nenhum rosto detectado na foto.")
         return None
 
-    # 2. Busca todos os colaboradores que têm rosto cadastrado e permissão para este restaurante
     query = "SELECT id, nome, centro_custo, os, pode_duas_vezes, restaurantes_permitidos, face_embedding FROM colaboradores WHERE face_embedding IS NOT NULL"
     colaboradores = run_db_query(query, fetch='all')
 
     for colab in colaboradores:
-        # Filtro de permissão do restaurante (Lógica igual ao CPF)
         permitidos = json.loads(colab[5] or '[]')
         if restaurante_nome not in permitidos:
             continue
             
-        # Compara o rosto (Threshold padrão é 0.6, menor é mais rigoroso)
         embedding_banco = np.array(json.loads(colab[6]))
         matches = face_recognition.compare_faces([embedding_banco], encoding_atual[0], tolerance=0.5)
         
         if matches[0]:
-            return colab[0:6] # Retorna as infos do colaborador encontrado
+            return colab[0:6]
             
     return None
 
-# --- AUXILIARES E RELATÓRIOS ---
 
 def to_excel(df: pd.DataFrame):
     output = io.BytesIO()
@@ -167,7 +172,7 @@ def tela_login():
         with st.form("login_form"):
             usuario = st.text_input("Usuário")
             senha = st.text_input("Senha", type="password")
-            if st.form_submit_button("ENTRAR", type='primary', use_container_width=True):
+            if st.form_submit_button("ENTRAR", type='primary', width='content'):
                 admin_data = run_db_query("SELECT nome, username, is_superadmin FROM usuarios_adm WHERE username = ? AND senha = ?", params=(usuario, senha), fetch='one')
                 if admin_data:
                     st.session_state.logged_in = True
@@ -245,7 +250,7 @@ def display_colaboradores_editor(current_username, is_superadmin):
     df_colab = run_db_query(colab_query, params, fetch='dataframe')
     if not df_colab.empty:
         df_colab['Biometria'] = df_colab['face_embedding'].apply(lambda x: "✅" if x else "❌")
-        st.dataframe(df_colab[['id', 'nome', 'cpf', 'centro_custo', 'os', 'Biometria']], use_container_width=True, hide_index=True)
+        st.dataframe(df_colab[['id', 'nome', 'cpf', 'centro_custo', 'os', 'Biometria']], width='content', hide_index=True)
 
 def verificar_e_registrar_refeicao(restaurante, colaborador_info):
     colab_id, colab_nome, colab_cc, colab_os, pode_duas_vezes, restaurantes_permitidos_json = colaborador_info
@@ -292,14 +297,14 @@ def display_reports():
         params.append(st.session_state.restaurante_associado)
         
     df = run_db_query(query, params, fetch='dataframe')
-    st.dataframe(df, use_container_width=True)
+    st.dataframe(df,width='content')
     
     if not df.empty:
         st.download_button("Exportar Excel", to_excel(df), "relatorio.xlsx")
 
 def tela_1():
     st.sidebar.markdown(f"**Usuário:** {st.session_state.current_user}")
-    if st.sidebar.button("Logout", use_container_width=True):
+    if st.sidebar.button("Logout", width='content'):
         st.session_state.clear(); st.rerun()
 
     if st.session_state.role == "admin":
@@ -335,7 +340,7 @@ def tela_1():
         with tabs[2]:
             st.subheader("Configuração de Restaurantes")
             df_rest = run_db_query("SELECT nome, username, senha, data_inicio, data_fim FROM restaurantes", fetch='dataframe')
-            edited_rest = st.data_editor(df_rest, num_rows="dynamic", use_container_width=True)
+            edited_rest = st.data_editor(df_rest, num_rows="dynamic", width='content')
             if st.button("Salvar Restaurantes"):
                 st.info("Funcionalidade de salvamento em lote ativa.")
 
@@ -348,7 +353,7 @@ def tela_1():
         col_c, col_f = st.columns(2)
         with col_c:
             cpf_r = st.text_input("CPF do Colaborador")
-            if st.button("Confirmar CPF", use_container_width=True):
+            if st.button("Confirmar CPF", width='content'):
                 res = run_db_query("SELECT id, nome, centro_custo, os, pode_duas_vezes, restaurantes_permitidos FROM colaboradores WHERE cpf = ?", (re.sub(r'\D', '', cpf_r),), fetch='one')
                 if res: verificar_e_registrar_refeicao(st.session_state.restaurante_associado, res)
                 else: st.error("CPF inválido.")

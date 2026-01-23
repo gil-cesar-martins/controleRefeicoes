@@ -1,5 +1,4 @@
 # Banco de Dados Local
-# Essencial: nunca envie seu banco de dados para o GitHub!
 *.db
 *.sqlite
 *.sqlite3
